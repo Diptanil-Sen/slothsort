@@ -1,0 +1,49 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>SlothSort</title>
+<style>
+:root{--bg:#EFEADF;--ink:#2B2A22;--mute:#6C6A5B;--card:#fff;--line:#DAD3C1;--acc:#5E7B3F;--warm:#E8A33D}
+@media (prefers-color-scheme:dark){:root{--bg:#171A12;--ink:#EEF0E2;--mute:#A3A992;--card:#222718;--line:#38402A}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,sans-serif}
+main{max-width:680px;margin:0 auto;padding:28px 18px 60px}
+h1{font:800 clamp(36px,10vw,54px)/1 Georgia,serif;letter-spacing:-.03em;margin:8px 0 10px}
+.sub{color:var(--mute);margin:0 0 22px}
+input[type=text]{width:100%;padding:14px;border:1.5px solid var(--line);border-radius:14px;background:var(--card);color:var(--ink);font:inherit}
+input[type=text]:focus{outline:3px solid var(--warm);border-color:var(--warm)}
+.btn{padding:15px 20px;border:0;border-radius:14px;background:var(--warm);color:#2B1B00;font:800 17px Georgia,serif;cursor:pointer;box-shadow:0 4px 0 #A9741C}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 #A9741C}.btn:disabled{opacity:.6}
+.ghost{background:none;border:1.5px solid var(--line);color:var(--ink);box-shadow:none;font:700 15px system-ui}
+.row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}.row .btn{flex:1}
+.msg{margin-top:14px;font-weight:700}.err{color:#C0392B}.ok{color:var(--acc)}
+.it{display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 14px;margin-top:8px}
+.it input{margin-top:6px;width:18px;height:18px;accent-color:var(--acc)}
+.o{font-size:13px;color:var(--mute);word-break:break-all}.n{font-weight:700;word-break:break-all}.f{color:var(--acc)}
+.fine{color:var(--mute);font-size:13px;margin-top:18px}
+</style></head><body><main>
+<h1>Tidy your folder. Do nothing.</h1>
+<p class="sub">Point me at a messy folder. Gemma, running on your own laptop, suggests where each file belongs and a clean name. You press one button.</p>
+<input type="text" id="p" value="~/Downloads" aria-label="Folder path">
+<div class="row"><button class="btn" id="scan">Look at my folder</button><button class="btn ghost" id="undo">Undo last tidy-up</button></div>
+<div class="msg" id="msg"></div><div id="list"></div><div id="act"></div>
+<p class="fine">Only loose files in this folder are touched. Nothing is deleted, and files are never overwritten.</p>
+</main><script>
+const $=id=>document.getElementById(id),mk=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
+let items=[];
+function say(t,bad){$("msg").className="msg "+(bad?"err":"ok");$("msg").textContent=t}
+async function post(u,b){const r=await fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)});const j=await r.json();if(!r.ok)throw new Error(j.detail||"Something went wrong");return j}
+$("scan").onclick=async()=>{
+  const b=$("scan");b.disabled=true;b.textContent="Thinking slowly… (can take a few minutes)";$("list").replaceChildren();$("act").replaceChildren();say("");
+  try{const j=await post("/api/scan",{folder:$("p").value});items=j.items;draw();say("Found "+items.length+" files. Untick anything you want left alone.")}
+  catch(e){say(e.message,1)}
+  b.disabled=false;b.textContent="Look at my folder";
+};
+function draw(){
+  const l=$("list");l.replaceChildren();
+  items.forEach((x,i)=>{const r=mk("label","it"),c=document.createElement("input");c.type="checkbox";c.checked=true;c.onchange=()=>x.off=!c.checked;
+    const d=mk("div");d.append(mk("div","o",x.src),mk("div","n",x.name),mk("div","f","→ "+x.folder+"/"));r.append(c,d);l.append(r)});
+  const a=mk("button","btn","Tidy it up");a.onclick=async()=>{
+    const moves=items.filter(x=>!x.off).map(x=>({src:x.src,folder:x.folder,name:x.name}));
+    try{const j=await post("/api/apply",{folder:$("p").value,moves});say("Moved "+j.moved+" files. You can undo this.");l.replaceChildren();$("act").replaceChildren()}catch(e){say(e.message,1)}};
+  $("act").replaceChildren(a);$("act").style.marginTop="16px";a.style.width="100%";
+}
+$("undo").onclick=async()=>{try{const j=await post("/api/undo",{folder:$("p").value});say("Put "+j.restored+" files back.")}catch(e){say(e.message,1)}};
+</script></body></html>
